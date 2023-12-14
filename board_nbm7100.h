@@ -1,11 +1,11 @@
 /**
  * @File Name: board_nbm7100.h
  * @brief  
- * @Author : 
+ * @Author : huangly@milesight.com
  * @Version : 1.0
  * @Creat Date : 2023-12-04
  * 
- * @copyright Copyright (c) 
+ * @copyright Copyright (c) 2023 星纵物联科技有限公司
  * @par 修改日志:
  * Date           Version     Author  Description
  * 2023-12-04     v1.0        huagnly 内容

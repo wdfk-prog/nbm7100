@@ -1,11 +1,11 @@
 /**
  * @File Name: nbm7100_driver.h
  * @brief  驱动实现,操作函数交由上层实现
- * @Author : 
+ * @Author : huangly@milesight.com
  * @Version : 1.0
  * @Creat Date : 2023-12-04
  * 
- * @copyright Copyright (c) 
+ * @copyright Copyright (c) 2023 星纵物联科技有限公司
  * @par 修改日志:
  * Date           Version     Author  Description
  * 2023-12-04     v1.0        huagnly 内容
@@ -57,7 +57,8 @@ typedef enum
 }nbm7100_state_e;
 /**
  * @brief  nbm7100模式
- * @note   None
+ * @note   初始化 -> 待机 -> 充电 -> 激活 -> 待机
+ *         ! 不可用待机转入激活;不可用充电转入待机
  */
 typedef enum
 {

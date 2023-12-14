@@ -1,11 +1,11 @@
 /**
  * @File Name: nbm7100_driver.c
  * @brief  驱动实现,操作函数交由上层实现
- * @Author : 
+ * @Author : huangly@milesight.com
  * @Version : 1.0
  * @Creat Date : 2023-12-04
  * 
- * @copyright Copyright (c) 2
+ * @copyright Copyright (c) 2023 星纵物联科技有限公司
  * @par 修改日志:
  * Date           Version     Author  Description
  * 2023-12-04     v1.0        huagnly 内容
@@ -157,8 +157,6 @@ static nbm7100_status_e nbm7100_mode_control(nbm7100_driver_t *dev, nbm7100_mode
             NBM7100_CLEAR_BIT(dev->reg[REGISTER_SET3], 7);
             break;
         case NBM7100_MODE_FORCE_ACTIVE:
-            NBM7100_CLEAR_BIT(dev->reg[REGISTER_COMMAND], 0);
-            NBM7100_CLEAR_BIT(dev->reg[REGISTER_COMMAND], 1);
             NBM7100_SET_BIT(dev->reg[REGISTER_COMMAND], 2);
             NBM7100_CLEAR_BIT(dev->reg[REGISTER_SET3], 7);
             break;
@@ -405,7 +403,7 @@ nbm7100_status_e nbm7100_send_charge_current(nbm7100_driver_t *dev, nbm7100_char
     if(ret != NBM7100_OK) {
         return ret;
     }
-    ret = nbm7100_write_register(dev, REGISTER_SET2, sizeof(dev->reg[REGISTER_SET2]));
+    ret = nbm7100_write_register(dev, REGISTER_SET2, dev->reg[REGISTER_SET2]);
     if(ret != NBM7100_OK) {
         return ret;
     }
@@ -426,11 +424,11 @@ nbm7100_status_e nbm7100_send_mode(nbm7100_driver_t *dev, nbm7100_mode_e mode)
     if(ret != NBM7100_OK) {
         return ret;
     }
-    ret = nbm7100_write_register(dev, REGISTER_COMMAND, sizeof(dev->reg[REGISTER_COMMAND]));
+    ret = nbm7100_write_register(dev, REGISTER_COMMAND, dev->reg[REGISTER_COMMAND]);
     if(ret != NBM7100_OK) {
         return ret;
     }
-    ret = nbm7100_write_register(dev, REGISTER_SET3, sizeof(dev->reg[REGISTER_SET3]));
+    ret = nbm7100_write_register(dev, REGISTER_SET3, dev->reg[REGISTER_SET3]);
     if(ret != NBM7100_OK) {
         return ret;
     }
@@ -446,7 +444,7 @@ nbm7100_status_e nbm7100_reset_profile(nbm7100_driver_t *dev)
 {
     NBM7100_SET_BIT(dev->reg[REGISTER_COMMAND], 3);
 
-    nbm7100_status_e ret = nbm7100_write_register(dev, REGISTER_COMMAND, sizeof(dev->reg[REGISTER_COMMAND]));
+    nbm7100_status_e ret = nbm7100_write_register(dev, REGISTER_COMMAND, dev->reg[REGISTER_COMMAND]);
 
     NBM7100_CLEAR_BIT(dev->reg[REGISTER_COMMAND], 3);
 
@@ -597,6 +595,10 @@ nbm7100_status_e nbm7100_driver_verify(nbm7100_driver_t *dev)
             ret = NBM7100_VERIFY_ERROR;
         }
     }
+    // for(uint8_t i = 0; i < REGISTER_READ_LEN; i++) {
+    //     printf("0x%02X ", read_buf[i]);
+    // }
+    // printf("\r\n");
 
     return ret;
 }

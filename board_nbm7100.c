@@ -1,11 +1,11 @@
 /**
  * @File Name: board_nbm7100.c
  * @brief  
- * @Author : 
+ * @Author : huangly@milesight.com
  * @Version : 1.0
  * @Creat Date : 2023-12-04
  * 
- * @copyright Copyright (c) 
+ * @copyright Copyright (c) 2023 星纵物联科技有限公司
  * @par 修改日志:
  * Date           Version     Author  Description
  * 2023-12-04     v1.0        huagnly 内容
@@ -154,12 +154,12 @@ static nbm7100_cfg_t nbm7100_cfg =
         .optimizer = 
         {
             .profile = NBM7100_PROFILE_FIXED_MODE,
-            .fixed_charge = NBM7100_END_CHARGE_5_2V,
+            .fixed_charge = NBM7100_END_CHARGE_4_4V,
             .margin_voltage = NBM7100_MARGIN_3_41V,
         },
         .output = 
         {
-            .output_voltage = NBM7100_OUTPUT_3_3V,
+            .output_voltage = NBM7100_OUTPUT_3_0V,
             .VDH_cfg        = VDH_CFG_VDH_VBT,
         },
         .charge = 
@@ -393,12 +393,15 @@ void board_nbm7100_init(void)
         return;
     }
     printf("[nbm7100][init]ok\r\n");
-    if(board_nbm7100_get_rdy() == false) {
-        //初始化充电电流50MA,后续再次充电变为8MA充电
-        board_nbm7100_set_mode(NBM7100_MODE_CONTINUOUS);
+    //初始化充电电流50MA,后续再次充电变为8MA充电
+    if(nbm7100_send_mode(&nbm7100, NBM7100_MODE_CONTINUOUS) != NBM7100_OK) {
+        printf("[nbm7100][mode]error:0X%02X\r\n", status);
+    } else {
+        printf("[nbm7100][mode]0X%02X\r\n", NBM7100_MODE_CONTINUOUS);
     }
-    // for (uint8_t i = 0; i < sizeof(nbm7100.reg); i++)
-    // {
+    //! 若没检查到电池,将会把设置复位;调试时查看是否配置异常
+    nbm7100_printf();
+    // for (uint8_t i = 0; i < sizeof(nbm7100.reg); i++) {
     //     printf("0x%02X ", nbm7100.reg[i]);
     // }
     // printf("\r\n");
@@ -414,15 +417,17 @@ void board_nbm7100_set_mode(nbm7100_mode_e mode)
     nbm7100_status_e ret = NBM7100_OK;
     nbm7100_mode = mode;
     if(mode == NBM7100_MODE_NONE) {
-        ret = nbm7100_send_mode(&nbm7100, NBM7100_MODE_FORCE_ACTIVE);
-        if(ret != NBM7100_OK) {
-            goto exit;
-        }
-        ret = nbm7100_send_mode(&nbm7100, mode);
+        ret = nbm7100_send_mode(&nbm7100, NBM7100_MODE_NONE);
         if(ret != NBM7100_OK) {
             goto exit;
         }
     } else{
+        if (mode == NBM7100_MODE_CONTINUOUS) {
+            ret = nbm7100_send_charge_current(&nbm7100, NBM7100_CHARGE_CURRENT_8MA);
+            if(ret != NBM7100_OK) {
+                goto exit;
+            }
+        }
         ret = nbm7100_send_mode(&nbm7100, nbm7100_mode);
         if(ret != NBM7100_OK) {
             goto exit;
@@ -438,7 +443,6 @@ exit:
             rdy_flag = RDY_NOT_READY;
         }
         printf("[nbm7100][set_mode]0X%02x\r\n", mode);
-        nbm7100_printf();
     }
 }
 /**
@@ -458,7 +462,6 @@ void board_nbm7100_poll(void)
         } else if(rdy_flag == GPIO_PIN_RESET) {
             //不是充电完成后主动退出充电模式导致的RDY为低电平
             if((nbm7100_mode == NBM7100_MODE_NONE && last_mode == NBM7100_MODE_CONTINUOUS) == 0) {
-                nbm7100_send_charge_current(&nbm7100, NBM7100_CHARGE_CURRENT_8MA);
                 board_nbm7100_set_mode(NBM7100_MODE_CONTINUOUS);
             }
         }
