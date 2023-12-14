@@ -34,8 +34,6 @@ extern "C" {
 void board_nbm7100_init(void);
 void board_nbm7100_set_mode(nbm7100_mode_e mode);
 bool board_nbm7100_get_rdy(void);
-void board_nbm7100_poll(void);
-void nbm7100_printf(void);
 uint8_t board_nbm7100_unit_debug(uint8_t *buffer, uint16_t size);
 
 #ifdef __cplusplus
