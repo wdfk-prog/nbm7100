@@ -61,11 +61,14 @@ typedef struct
 }nbm7100_spi_t;
 #endif /* NBM7100_TYPE == NBM7110A */
 
-enum
+typedef enum
 {
     RDY_NOT_READY = 0,
     RDY_READY,
-};
+    RDY_FAILED,
+    RDY_SUCCESS,
+    RDY_MAX,
+}nbm7100_rdy_t;
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -105,6 +108,8 @@ static const char *nbm7100_vcap_string[] =
     [NBM7100_VCAP_11_07V] = "11.07V",
 };
 static nbm7100_driver_t nbm7100 = {0};
+static nbm7100_mode_e g_nbm7100_mode = NBM7100_MODE_MAX;
+static nbm7100_rdy_t g_nbm7100_status = RDY_SUCCESS;
 #if NBM7100_TYPE == NBM7110A
 static nbm7100_i2c_t nbm7100_i2c = 
 {
@@ -157,7 +162,7 @@ static nbm7100_cfg_t nbm7100_cfg =
         .charge = 
         {
             .max_storage    = NBM7100_MAX_STORAGE_9_9V,
-            .charge_current = NBM7100_CHARGE_CURRENT_50MA,
+            .charge_current = NBM7100_CHARGE_CURRENT_8MA,
         },
         .battery = 
         {
@@ -190,7 +195,7 @@ static nbm7100_ops_t nbm7100_ops = {
 static void nbm7100_rdy_event(void* context)
 {
     UNUSED(context);
-    printf("[nbm7100]RDY_READY\r\n");
+    printf("[nbm7100]RDY:%lu\r\n", GpioRead(&nbm7100_i2c.rdy.obj));
 }
 #endif // NBM7100_RDY_PIN
 /**
@@ -245,7 +250,7 @@ static nbm7100_status_e nbm7100_init(void)
     nbm7100_rdy_init(true);
 #if (NBM7100_TYPE == NBM7110A)
     I2cInit(&nbm7100_i2c.obj, nbm7100_i2c.Id, nbm7100_i2c.sda, nbm7100_i2c.scl);
-    nbm7100_start_init(true);
+    // nbm7100_start_init(true);
 #elif (NBM7100_TYPE == NBM7110B)
     MX_SPI1_Init();
     GpioInit(&nbm7100_spi.nss.obj, nbm7100_spi.nss.pin, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, !nbm7100_spi.nss.enable);
@@ -335,6 +340,23 @@ static nbm7100_status_e nbm7100_delay_ms(uint32_t ms)
     return NBM7100_OK;
 }
 /**
+ * @brief  未接电池,打印将会是默认值
+ * @note   None
+ */
+void nbm7100_printf(void)
+{
+    nbm7100_info_t info = {0};
+    nbm7100_read_info(&nbm7100, &info);
+
+    printf("ready:%u,alarm_low_voltage:%u,alarm_early_warning:%u,alarm_vdh_output:%u\r\n", 
+        info.status.data.ready, info.status.data.alarm_low_voltage, info.status.data.alarm_early_warning, info.status.data.alarm_vdh_output);
+    printf("electric_quantity:%luuAh,actual_Vcap:%s,target_voltage:%s\r\n", info.electric_quantity, nbm7100_vcap_string[info.actual_Vcap], nbm7100_vcap_string[info.target_voltage]);
+    //! 没有接入电池上电,配置将会被重置为默认值,重启防止电容充电过高
+    if(info.target_voltage != NBM7100_VCAP_4_39V) {
+        device_restart();
+    }
+}
+/**
  * @brief  nbm7100初始化
  * @note   None
  */
@@ -357,15 +379,20 @@ void board_nbm7100_init(void)
     status = nbm7100_driver_verify(&nbm7100);
     if(status != NBM7100_OK) {
         printf("[nbm7100][verify]error:0X%02X\r\n", status);
+        device_restart();
         return;
     }
     printf("[nbm7100][init]ok\r\n");
-    //初始化充电电流50MA,后续再次充电变为8MA充电
+    NODE_CRITICAL_SECTION_BEGIN();
+    //初始化充电电流8MA,后续再次充电变为4MA充电
+    g_nbm7100_mode = NBM7100_MODE_CONTINUOUS;
     if(nbm7100_send_mode(&nbm7100, NBM7100_MODE_CONTINUOUS) != NBM7100_OK) {
         printf("[nbm7100][mode]error:0X%02X\r\n", status);
     } else {
         printf("[nbm7100][mode]0X%02X\r\n", NBM7100_MODE_CONTINUOUS);
     }
+    NODE_CRITICAL_SECTION_END();
+    nbm7100_printf();
     // for (uint8_t i = 0; i < sizeof(nbm7100.reg); i++) {
     //     printf("0x%02X ", nbm7100.reg[i]);
     // }
@@ -377,33 +404,32 @@ void board_nbm7100_init(void)
  * @param  mode: 模式
  * @retval None
  */
-void board_nbm7100_set_mode(nbm7100_mode_e mode)
+nbm7100_status_e board_nbm7100_set_mode(nbm7100_mode_e mode)
 {
+    printf("[nbm7100][set_mode start]0X%02x\r\n", mode);
     nbm7100_status_e ret = NBM7100_OK;
-    if(mode == NBM7100_MODE_NONE) {
-        ret = nbm7100_send_mode(&nbm7100, mode);
+    if (mode == NBM7100_MODE_CONTINUOUS) {
+        ret = nbm7100_send_charge_current(&nbm7100, NBM7100_CHARGE_CURRENT_4MA);
         if(ret != NBM7100_OK) {
             goto exit;
         }
-    } else{
-        if (mode == NBM7100_MODE_CONTINUOUS) {
-            ret = nbm7100_send_charge_current(&nbm7100, NBM7100_CHARGE_CURRENT_8MA);
-            if(ret != NBM7100_OK) {
-                goto exit;
-            }
-        }
-        ret = nbm7100_send_mode(&nbm7100, mode);
-        if(ret != NBM7100_OK) {
-            goto exit;
-        }
+    }
+    ret = nbm7100_send_mode(&nbm7100, mode);
+    if(ret != NBM7100_OK) {
+        goto exit;
     }
 
 exit:
+    printf("[nbm7100][mode]0X%02x\r\n", mode);
+    g_nbm7100_mode = mode;
+
     if(ret != NBM7100_OK) {
-        printf("[nbm7100][set_mode]error:0X%02x\r\n", ret);
+        printf("[nbm7100][mode]error:0X%02x\r\n", ret);
+        g_nbm7100_status = RDY_FAILED;
     } else {
-        printf("[nbm7100][set_mode]0X%02x\r\n", mode);
+        g_nbm7100_status = RDY_SUCCESS;
     }
+    return ret;
 }
 /**
  * @brief  获取 nbm7100 是否准备
@@ -412,25 +438,48 @@ exit:
  */
 bool board_nbm7100_get_rdy(void)
 {
-    uint32_t rdy_flag = GpioRead(&nbm7100_i2c.rdy.obj);
-    if(rdy_flag == GPIO_PIN_SET) {
-        return true;
-    } else {
-        return false;
+    //! 第一次充满电后,需要重新激活一次充电状态再次充满后,才算是准备好
+    static bool first = true;
+    bool rdy = false;
+
+    if(g_nbm7100_status == RDY_FAILED) {
+        printf("[nbm7100]send failed retry\r\n");
+        board_nbm7100_set_mode(g_nbm7100_mode);
+    } else if(g_nbm7100_status == RDY_SUCCESS) {
+        if(GpioRead(&nbm7100_i2c.rdy.obj) == RDY_READY || g_nbm7100_mode == NBM7100_MODE_NONE) {
+            if(first == true) {
+                first = false;
+
+                nbm7100_status_e ret = NBM7100_OK;
+                ret = board_nbm7100_set_mode(NBM7100_MODE_FORCE_ACTIVE);
+                if(ret != NBM7100_OK) {
+                    goto exit;
+                }
+
+                HAL_Delay(100);
+                ret = board_nbm7100_set_mode(NBM7100_MODE_CONTINUOUS);
+                if(ret != NBM7100_OK) {
+                    goto exit;
+                }
+            }
+            rdy = true;
+        }
     }
+
+exit:
+    return rdy;
 }
 /**
- * @brief  未接电池,打印将会是默认值
- * @note   None
+ * @brief  退出低功耗处理
+ * @note   判断充电是否完成,完成则进入待机模式
+ * @retval None
  */
-void nbm7100_printf(void)
+void board_nbm7100_lpm_exit(void)
 {
-    nbm7100_info_t info = {0};
-    nbm7100_read_info(&nbm7100, &info);
-
-    printf("ready:%u,alarm_low_voltage:%u,alarm_early_warning:%u,alarm_vdh_output:%u\r\n", 
-        info.status.data.ready, info.status.data.alarm_low_voltage, info.status.data.alarm_early_warning, info.status.data.alarm_vdh_output);
-    printf("electric_quantity:%luuAh,actual_Vcap:%s,target_voltage:%s\r\n", info.electric_quantity, nbm7100_vcap_string[info.actual_Vcap], nbm7100_vcap_string[info.target_voltage]);
+    if(g_nbm7100_mode == NBM7100_MODE_CONTINUOUS && GpioRead(&nbm7100_i2c.rdy.obj) == RDY_READY) {
+        //充电完成,进入待机模式
+        board_nbm7100_set_mode(NBM7100_MODE_NONE);
+    }
 }
 /**
  * @brief  nbm7100单元测试
