@@ -32,11 +32,12 @@ extern "C" {
 
 /* Exported functions prototypes ----------------------------------------------*/
 void board_nbm7100_init(void);
-void board_nbm7100_set_mode(nbm7100_mode_e mode);
+nbm7100_status_e board_nbm7100_set_mode(nbm7100_mode_e mode);
 bool board_nbm7100_get_rdy(void);
-void board_nbm7100_poll(void);
-void nbm7100_printf(void);
+bool board_nbm7100_ready(void);
+void board_nbm7100_lpm_exit(void);
 uint8_t board_nbm7100_unit_debug(uint8_t *buffer, uint16_t size);
+void nbm7100_printf(void);
 
 #ifdef __cplusplus
 }

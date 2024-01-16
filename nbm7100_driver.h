@@ -41,6 +41,7 @@ typedef enum
     NBM7100_WRITE_ERROR,//写入错误
     NBM7100_VERIFY_ERROR,//校验错误
     NBM7100_LOCK,       //锁定
+    NBM7100_UNLOCK,     //解锁
     NBM7100_INVALID,    //参数无效
 }nbm7100_status_e;
 /**
@@ -57,11 +58,12 @@ typedef enum
 }nbm7100_state_e;
 /**
  * @brief  nbm7100模式
- * @note   None
+ * @note   初始化 -> 待机 -> 充电 -> 激活 -> 待机
+ *         ! 不可用待机转入激活;不可用充电转入待机
  */
 typedef enum
 {
-    NBM7100_MODE_NONE = 0,
+    NBM7100_MODE_NONE = 0,      //待机模式
     NBM7100_MODE_ON_DEMAND,     //此模式旨在最大限度地延长系统大部分时间处于睡眠模式的低占空比应用中的电池寿命
     NBM7100_MODE_CONTINUOUS,    //连续模式适用于需要即时脉冲负载能力的应用
     NBM7100_MODE_FORCE_ACTIVE,  //强制激活
