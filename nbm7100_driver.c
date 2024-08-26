@@ -518,7 +518,7 @@ nbm7100_status_e nbm7100_driver_deinit(nbm7100_driver_t *dev)
  */
 nbm7100_status_e nbm7100_read_info(nbm7100_driver_t *dev, nbm7100_info_t *info)
 {
-    if(info == NULL) {
+    if(info == NULL || dev == NULL || dev->cfg == NULL || dev->ops == NULL) {
         return NBM7100_INVALID;
     }
 
