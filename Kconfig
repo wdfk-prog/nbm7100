@@ -1,0 +1,15 @@
+config PKG_USING_NBM7100
+    bool "NBM7100: Driver for NBM7100 battery monitor"
+    select RT_USING_I2C
+    default n
+    help
+      This package provides a driver for the NBM7100 battery monitor IC.
+      It supports reading chip ID, battery voltage, and other features via the I2C interface.
+
+if PKG_USING_NBM7100
+    config NBM7100_I2C_BUS_NAME
+        string "I2C bus name for NBM7100"
+        default "i2c1"
+        help
+            Specify the I2C bus name that NBM7100 is connected to, e.g., "i2c1".
+endif
